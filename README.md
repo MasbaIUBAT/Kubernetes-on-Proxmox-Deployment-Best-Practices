@@ -1,46 +1,34 @@
-# Kubernetes-on-Proxmox-Deployment-Best-Practices
-•  Kubernetes on Proxmox: PV/PVC storage, ClusterIP/NodePort, liveness &amp; readiness probes for zero-downtime.
+Kubernetes on Proxmox
 
-Kubernetes on Proxmox: Deployment & Best Practices
-1. Introduction
+This repository provides documentation and best practices for running **Kubernetes clusters on Proxmox VE**.  
+It covers:
 
-This document provides guidance on deploying and managing Kubernetes clusters on Proxmox VE. It covers persistent storage (PV/PVC), service exposure (ClusterIP vs NodePort), and implementing liveness/readiness probes to ensure high availability and zero-downtime application updates.
+- Persistent Volumes (PV) & Persistent Volume Claims (PVC)  
+- Service exposure (ClusterIP vs NodePort)  
+- Liveness & Readiness Probes for **zero-downtime deployments**
 
-2. Environment Setup on Proxmox
+---
 
-Proxmox VE is used as the virtualization platform.
+## 🚀 Environment Setup
 
-Kubernetes nodes (masters & workers) are deployed as VMs on Proxmox.
+- **Virtualization Platform:** Proxmox VE  
+- **Kubernetes Nodes:** Deployed as VMs on Proxmox  
+- **Networking:**  
+  - Proxmox bridges (e.g., `vmbr0`, `vmbr1`)  
+  - Kubernetes CNI plugins (Calico, Flannel, Cilium)
 
-Networking can be handled via:
+---
 
-Proxmox bridges (vmbr0, vmbr1, etc.)
+## 📦 Persistent Volumes (PV) & PVC
 
-CNI plugin inside Kubernetes (e.g., Calico, Flannel, Cilium).
+### Storage Options on Proxmox
+- Local storage (bind-mounted disks or directories)  
+- Ceph RBD (**recommended**)  
+- NFS / iSCSI (shared storage)  
+- ZFS pools  
 
-3. Persistent Volumes (PV) & Persistent Volume Claims (PVC)
-3.1 Storage Options on Proxmox
-
-Local storage: Bind-mounted disks or directories.
-
-Proxmox storage backends:
-
-Ceph RBD (recommended for production, distributed & replicated)
-
-NFS/iSCSI (shared storage)
-
-ZFS pools (fast, resilient)
-
-3.2 PV/PVC Workflow
-
-Define a PersistentVolume (PV) – Represents physical storage.
-
-Create a PersistentVolumeClaim (PVC) – Request for storage by a pod.
-
-Kubelet attaches the storage automatically if PV matches PVC requirements.
-
-Example PVC with Ceph RBD:
-
+### Example PVC (Ceph RBD)
+```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -52,16 +40,12 @@ spec:
   resources:
     requests:
       storage: 5Gi
+🌐 Service Types
+ClusterIP (default)
+Internal-only service, accessible inside the cluster.
 
-4. Service Types: ClusterIP vs NodePort
-4.1 ClusterIP (default)
-
-Internal-only service.
-
-Pods can communicate using the service DNS name.
-
-Use when services should not be directly exposed outside the cluster.
-
+yaml
+Copy code
 apiVersion: v1
 kind: Service
 metadata:
@@ -72,13 +56,11 @@ spec:
   ports:
     - port: 8080
   type: ClusterIP
+NodePort
+Exposes a service on each node’s IP at a static port (30000–32767).
 
-4.2 NodePort
-
-Exposes service on each node’s IP at a static port (30000–32767).
-
-Useful for development or when external load balancers are not available.
-
+yaml
+Copy code
 apiVersion: v1
 kind: Service
 metadata:
@@ -90,20 +72,19 @@ spec:
     - port: 80
       nodePort: 30080
   type: NodePort
+⚠️ Best Practice: Use Ingress + LoadBalancer (via MetalLB or HAProxy) for production instead of NodePort.
 
+🔄 Liveness & Readiness Probes
+Why Probes?
+Liveness Probe: Restarts unresponsive containers
 
-Best Practice: Use Ingress + LoadBalancer (via MetalLB or HAProxy on Proxmox) for production instead of relying on NodePort.
+Readiness Probe: Ensures pod is ready before receiving traffic
 
-5. Liveness & Readiness Probes for Zero-Downtime
-5.1 Why Probes?
+Critical for rolling updates & zero downtime
 
-Liveness Probe: Ensures the container is healthy; restarts it if unresponsive.
-
-Readiness Probe: Ensures the pod is ready before it starts receiving traffic.
-
-Essential for rolling updates and zero-downtime deployments.
-
-5.2 Example Deployment with Probes
+Example Deployment
+yaml
+Copy code
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -140,24 +121,14 @@ spec:
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 20
+✅ Best Practices
+Use Ceph RBD or ZFS-backed CSI drivers for PVs
 
-6. Best Practices
+Prefer ClusterIP + Ingress/MetalLB for production services
 
-Storage: Use Ceph RBD or ZFS-backed CSI drivers for dynamic PV provisioning in Proxmox.
+Configure readiness & liveness probes correctly
 
-Services: Prefer ClusterIP + Ingress/MetalLB for production-grade service exposure.
+Use RollingUpdate strategy with maxUnavailable=1
 
-Zero Downtime:
-
-Configure probes properly.
-
-Use RollingUpdate strategy with maxUnavailable=1.
-
-Always test probes locally before production rollout.
-
-7. Conclusion
-
-Running Kubernetes on Proxmox provides flexibility for homelab and production environments. By configuring PV/PVC for persistent storage, properly exposing services, and using probes, you can ensure scalability, resiliency, and zero downtime for your workloads.
-
-
+Test probes locally before rollout
 
